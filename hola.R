@@ -1,0 +1,203 @@
+library(OpenImageR)
+
+# Install and load the imager package
+#install.packages("imager")
+library(imager)
+library(gridExtra)
+library(grid)
+library(class)
+library(dplyr)
+source("our_knn.R")
+
+
+split_train_test <- function(files) {
+  set.seed(42) #To select people randomly but in the same way in every execution of the code
+  
+  # Extract label from every image
+  images <- c()
+  identifiers <- c()
+  for (image in files) {
+    if (substr(image, nchar(image) - 3 + 1, nchar(image)) == 'jpg') {
+      images <- c(images, image)
+      label <- gsub(".*?([0-9]+).*", "\\1", image) #1 refers to first
+      identifiers <- c(identifiers, as.numeric(label)) #there should be 25 ids
+    }
+  }
+  
+  # Set up the dataframe
+  df <- data.frame(images, as.factor(identifiers))
+  names(df) <- c('file', 'target') 
+  
+  # Randomly select 4 identifiers to exclude from training
+  set.seed(42)
+  excluded_identifiers <- sample(unique(df$target), 4)
+  
+  # Exclude the selected identifiers from the training set
+  df_train_validation <- df[!df$target %in% excluded_identifiers,]
+  
+  # Randomly select 5 images for training and 1 for testing for each remaining identifier
+  df_train_validation <- df_train_validation %>%
+    group_by(target) %>%
+    mutate(split = sample(c(rep('train', 5), 'test'), size = n())) %>% #5 IMAGES TO TRAIN, 1 to test
+    ungroup()
+  
+  # Add the excluded identifiers to the test set
+  df_test <- df[df$target %in% excluded_identifiers,]
+  df_test$split <- 'test'
+  
+  # Combine the datasets
+  split_df <- rbind(df_train_validation, df_test)
+  return(as.data.frame(split_df))
+}
+
+# Specify the directory containing your image files
+#setwd("C:/Users/laram/Desktop/Todo/UC3M/Second Bimester/Statistical Learning/Assignment")
+#image_directory <- "C:/Users/laram/Desktop/Todo/UC3M/Second Bimester/Statistical Learning/Assignment/Training"
+image_directory <- "C:/Training"
+
+# Obtén la lista de archivos en la carpeta
+lista_archivos <- list.files(path = image_directory, pattern = ".*\\.jpg$", full.names = TRUE)
+
+prueba2 = split_train_test(lista_archivos)
+df_train_data <- subset(prueba2,split == 'train')
+df_test_data <- subset(prueba2,split == 'test')
+
+#Read train and test images 
+
+read_images <- function(lista_archivos){
+  # Crea una lista para almacenar las imágenes
+  data_images <- list()
+  
+  i=1
+  # Bucle for para leer cada imagen
+  for (archivo in lista_archivos) {
+    # Leer la imagen y almacenarla en la lista
+    data_image = readImage(archivo)
+    data_images[[i]] <- data_image
+    i=i + 1
+  }
+  return(data_images)
+}
+
+
+transform_data <- function(image_list){
+  #Add every image to the matrix
+  # Inicializes the matrix
+  pic_matrix <- matrix(nrow = 0, ncol = 3 * dim(image_list[[1]])[1])  # Inicializa con el tamaño correcto
+  
+  # Transforma los datos de cada imagen y agrega a la matriz
+  for (i in seq_along(image_list)) {
+    pic <- image_list[[i]]
+    
+    #Verifying the size of every image
+    #print(dim(pic))
+    
+    # Transforma los datos de las tres componentes en una fila de la futura matriz de datos
+    pic_matrix <- apply(pic, 3, as.vector)
+    
+    # Verifying that the necessary matrix has the correct dimensions
+    #print(dim(pic_matrix))
+    }
+  return(pic_matrix)
+}
+
+#a) Build a function that implements the Principal Component Analysis. This function takes as 
+#input a set of observations and returns the mean of these observations, the matrix P containing the 
+#eigenvectors and a vector D containing the variance explained by each principal axis. It is only 
+#allowed to use the function eigen. 
+
+#Step 1: Creating the PCA function
+
+#DATA IS A SET OF OBSERVATIONS
+pca <- function(data) { 
+  # Calculate the mean of the observations
+  mean_vec <- colMeans(data)
+  
+  # Center the data by subtracting the mean (and we have to decide whether if we scale or not)
+  centered_data <- scale(data, center = mean_vec, scale = F) #cambiar centrer = T y ver si sale igual
+  
+  # Compute the covariance matrix
+  cov_matrix <- cov(centered_data)
+  
+  #From now on, we perform everything with the short form of the data matrix (as h<<P).
+  
+  # Perform eigenvalue decomposition for the short
+  
+  eigen_result <- eigen(t(cov_matrix)) #is the short this transposed?
+
+  # Extract eigenvectors (P) and eigenvalues (e_values)
+  e_values <- eigen_result$values #as P will be calculated using the shot and the eigenvalues of the long and the short are the same, we direclty calculate them with the short
+  P_short <- eigen_result$vectors #this cannot be calculated like this as data is too large (36000*36000) so instead we use the short (150x150) 
+  print(dim(P_short)) # should be 150*1????????????????????????? 
+  print(dim(data))
+  
+  
+  sdev <- sqrt(e_values) #standard deviations of the principal components
+  
+  #Percentage of the variance retaining by the PCs
+  D <- cumsum(sdev^2/sum(sdev^2))
+  
+  #Now we calculate the eigenvectors of the long matrix
+  #to do this, we need the eigenvectors of the short and data
+  
+  P <- centered_data%*%P_short #shape(P) should be 36000*1
+  print(dim(P))
+  
+  # Return mean, eigenvectors (matrix P), and variance (matrix D) of the set of observations
+  result <- list(mean = mean_vec, P = P, D = D)
+  return(result)
+}
+
+
+#b) Build a classifier (function) that takes as input an image and an object with the parameters of 
+#the classifier. Internally, the function uses a k-nn classifier and the PCA representation of the images. 
+#If the person in the image belongs to the database, it returns the person’s identifiers. Otherwise it 
+#returns 0.
+
+classifier <- function(df_train_data, df_test_data, parameters) {
+  
+  #1. Read the files from the dataframe
+  images_train = read_images(df_train_data$file)
+  images_test = read_images(df_test_data$file)
+  
+  #1. Transform the data
+  
+  train_matrix = transform_data(images_train)
+  test_matrix = transform_data(images_test)
+  
+  #2. Apply the PCA function only to the training
+  pca_values = pca(train_matrix)
+  
+  means = pca_values$mean
+  P = pca_values$P
+  D = pca_values$D
+  
+  #3. KNN with PCA
+  datos_train = data.frame(x = P[,1], #taking the two first components of P
+                     y = P[,2])
+  datos_test = data.frame(x = P[,1], 
+                           y = P[,2])
+  
+  #knn_PCA <- our_knn(datos_train, datos_test, df_train_data$target, 3)
+    
+  #4. KNN without PCA
+  knn_applied <- our_knn(train_matrix, test_matrix, df_train_data$target, 3)
+  
+  #identifier = 
+  return(knn_applied)
+}
+
+parameters = list(var_expained=0.9,k=9,metric='mse',threshold=3)
+
+resultado = classifier(df_train_data, df_test_data, parameters)
+
+pca_out= pca(resultado) #Our PCA value
+
+
+#Values to compare our solution
+real_pca = prcomp(resultado) #The real PCA value
+#D_real = cumsum(real_pca$sdev^2/sum(real_pca$sdev^2)) #make sure that D calculated in our function has the proper value
+
+
+#resultado = classifier(image_list = data_images, parameters)
+
