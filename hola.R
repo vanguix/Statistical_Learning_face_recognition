@@ -83,20 +83,20 @@ read_images <- function(lista_archivos){
 transform_data <- function(image_list){
   #Add every image to the matrix
   # Inicializes the matrix
-  pic_matrix <- matrix(nrow = 0, ncol = 3 * dim(image_list[[1]])[1])  # Inicializa con el tamaño correcto
+  #pic_matrix <- matrix(nrow = 0, ncol = 3 * dim(image_list[[1]])[1])  # Inicializa con el tamaño correcto
+  pic_matrix <- matrix(nrow = 0, ncol = 108000)  # Inicializa con el tamaño correcto
   
   # Transforma los datos de cada imagen y agrega a la matriz
   for (i in seq_along(image_list)) {
     pic <- image_list[[i]]
-    
-    #Verifying the size of every image
-    #print(dim(pic))
-    
+
     # Transforma los datos de las tres componentes en una fila de la futura matriz de datos
-    pic_matrix <- apply(pic, 3, as.vector)
+    new_row <- t(as.vector(pic))
+    pic_matrix <- rbind(pic_matrix, new_row)
     
     # Verifying that the necessary matrix has the correct dimensions
     #print(dim(pic_matrix))
+    
     }
   return(pic_matrix)
 }
@@ -164,6 +164,10 @@ classifier <- function(df_train_data, df_test_data, parameters, PCAopt) {
   
   train_matrix = transform_data(images_train)
   test_matrix = transform_data(images_test)
+  print('----------------')
+  print(dim(train_matrix))
+  print(dim(test_matrix))
+  
   
   if (PCAopt == TRUE) {
     #2. Apply the PCA function only to the training
@@ -188,7 +192,6 @@ classifier <- function(df_train_data, df_test_data, parameters, PCAopt) {
     
     datos_test = data.frame(x = test_PCA[,1], #taking the two first components of test_PCA
                              y = test_PCA[,2])
-    print('esto ke es')
     
     knn_applied <- our_knn(datos_train, datos_test, df_train_data$target, 3)
   }
