@@ -2,7 +2,7 @@ library(OpenImageR)
 
 # Install and load the imager package
 #install.packages("imager")
-library(imager)
+#library(imager)
 library(gridExtra)
 library(grid)
 library(class)
@@ -37,12 +37,12 @@ split_train_test <- function(files) {
   # Randomly select 5 images for training and 1 for testing for each remaining identifier
   df_train_validation <- df_train_validation %>%
     group_by(target) %>%
-    mutate(split = sample(c(rep('train', 5), 'test'), size = n())) %>% #5 IMAGES TO TRAIN, 1 to test
+    mutate(split = sample(c(rep('train', 5), 'test1'), size = n())) %>% #5 IMAGES TO TRAIN, 1 to test
     ungroup()
   
   # Add the excluded identifiers to the test set
   df_test <- df[df$target %in% excluded_identifiers,]
-  df_test$split <- 'test'
+  df_test$split <- 'test2'
   
   # Combine the datasets
   split_df <- rbind(df_train_validation, df_test)
@@ -60,7 +60,7 @@ lista_archivos <- list.files(path = image_directory, pattern = ".*\\.jpg$", full
 prueba2 = split_train_test(lista_archivos)
 
 df_train_data <- subset(prueba2,split == 'train')
-df_test_data <- subset(prueba2,split == 'test')
+df_test_data <- subset(prueba2,split != 'train')
 
 #Read train and test images 
 
@@ -116,14 +116,15 @@ pca <- function(data) {
   # Center the data by subtracting the mean (and we have to decide whether if we scale or not)
   centered_data <- scale(data, center = mean_vec, scale = F) #cambiar centrer = T y ver si sale igual
   
+  
   # Compute the covariance matrix
-  cov_matrix <- cov(centered_data)
+  cov_matrix <- cov(t(centered_data))
   
   #From now on, we perform everything with the short form of the data matrix (as h<<P).
   
   # Perform eigenvalue decomposition for the short
   
-  eigen_result <- eigen(t(cov_matrix)) #is the short this transposed?
+  eigen_result <- eigen(cov_matrix) #is the short this transposed?
 
   # Extract eigenvectors (P) and eigenvalues (e_values)
   e_values <- eigen_result$values #as P will be calculated using the shot and the eigenvalues of the long and the short are the same, we direclty calculate them with the short
@@ -132,19 +133,21 @@ pca <- function(data) {
   print(dim(data))
   
   
-  sdev <- sqrt(e_values) #standard deviations of the principal components
+  #sdev <- sqrt(e_values) #standard deviations of the principal components
   
   #Percentage of the variance retaining by the PCs
-  D <- cumsum(sdev^2/sum(sdev^2))
+  #D <- cumsum(sdev^2/sum(sdev^2))
+  D<-cumsum(e_values)/sum(e_values)
   
   #Now we calculate the eigenvectors of the long matrix
   #to do this, we need the eigenvectors of the short and data
   
   #When applying the P eigenvectors 
-  reduced_data <- centered_data%*%P_short #shape(P) should be 36000*1
+  P <- t(centered_data)%*%P_short #shape(P) should be 36000*1
   
+  reduced_data<-centered_data%*% P
   # Return mean, eigenvectors (matrix P), and variance (matrix D) of the set of observations
-  result <- list(mean = mean_vec, P = P_short, D = D, reduced_data = reduced_data)
+  result <- list(mean = mean_vec, P = P, D = D, reduced_data= reduced_data)
   return(result)
 }
 
@@ -164,20 +167,21 @@ classifier <- function(df_train_data, df_test_data, parameters, PCAopt) {
   
   train_matrix = transform_data(images_train)
   test_matrix = transform_data(images_test)
-  print('----------------')
-  print(dim(train_matrix))
-  print(dim(test_matrix))
+  #print('----------------')
+  #print(dim(train_matrix))
+  #print(dim(test_matrix))
   
-  
+  #2. Apply KNN
   if (PCAopt == TRUE) {
-    #2. Apply the PCA function only to the training
+    #2.1. Apply the PCA function only to the training
     pca_values = pca(train_matrix)
     
+    P= pca_values$P
     means = pca_values$mean
-    train_PCA = pca_values$reduced_data #train data having used PCA to reduce dimensionality
+    train_PCA =  pca_values$reduced_data #train data having used PCA to reduce dimensionality
     D = pca_values$D
     
-    #3. KNN with PCA
+    #2.2. KNN with PCA
     #First, we select the data that will be used for KNN.
     #The training set is already transformed in the previous PCA function.
     datos_train = data.frame(x = train_PCA[,1], #taking the two first components of train_PCA
@@ -185,28 +189,36 @@ classifier <- function(df_train_data, df_test_data, parameters, PCAopt) {
     
     #The testing set needs to be transformed with the eigenvectors and the mean from
     #the training set after applying PCA.
-    centered_data <- scale(test_matrix, center = means, scale = F)
+    centered_data_test <- scale(test_matrix, center = means, scale = F)
     
+    print('-------------')
+    print(dim(centered_data_test))
+    print(dim(P))
     #When applying the P eigenvectors 
-    test_PCA <- centered_data%*%pca_values$P
+    test_PCA <- centered_data_test %*% P
     
     datos_test = data.frame(x = test_PCA[,1], #taking the two first components of test_PCA
                              y = test_PCA[,2])
     
-    knn_applied <- our_knn(datos_train, datos_test, df_train_data$target, 3)
+    knn_applied <- our_knn_multiple(datos_train, datos_test, df_train_data$target, 3)
   }
   else{
-    #KNN without PCA
+    #2.3. KNN without PCA
     knn_applied <- our_knn_multiple(train_matrix, test_matrix, df_train_data$target, 3)
   }
   
-  #identifier = 
+  #3. Accuracy from the predictions
+  
+  #knn_applied$predicted == df_test_data$target
+  
   return(knn_applied)
 }
 
 parameters = list(var_expained=0.9,k=9,metric='mse',threshold=3)
 
 resultado = classifier(df_train_data, df_test_data, parameters, 0) #using PCA
+
+resultado_pca= classifier(df_train_data, df_test_data, parameters, 1)
 
 
 #pca_out= pca(resultado) #Our PCA value
