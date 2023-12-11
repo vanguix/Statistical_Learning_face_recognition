@@ -9,7 +9,6 @@ library(class)
 library(dplyr)
 source("our_knn.R")
 
-
 split_train_test <- function(files) {
   set.seed(42) #To select people randomly but in the same way in every execution of the code
   
@@ -59,6 +58,7 @@ image_directory <- "C:/Training"
 lista_archivos <- list.files(path = image_directory, pattern = ".*\\.jpg$", full.names = TRUE)
 
 prueba2 = split_train_test(lista_archivos)
+
 df_train_data <- subset(prueba2,split == 'train')
 df_test_data <- subset(prueba2,split == 'test')
 
@@ -140,11 +140,11 @@ pca <- function(data) {
   #Now we calculate the eigenvectors of the long matrix
   #to do this, we need the eigenvectors of the short and data
   
-  P <- centered_data%*%P_short #shape(P) should be 36000*1
-  print(dim(P))
+  #When applying the P eigenvectors 
+  reduced_data <- centered_data%*%P_short #shape(P) should be 36000*1
   
   # Return mean, eigenvectors (matrix P), and variance (matrix D) of the set of observations
-  result <- list(mean = mean_vec, P = P, D = D)
+  result <- list(mean = mean_vec, P = P_short, D = D, reduced_data = reduced_data)
   return(result)
 }
 
@@ -154,7 +154,7 @@ pca <- function(data) {
 #If the person in the image belongs to the database, it returns the person’s identifiers. Otherwise it 
 #returns 0.
 
-classifier <- function(df_train_data, df_test_data, parameters) {
+classifier <- function(df_train_data, df_test_data, parameters, PCAopt) {
   
   #1. Read the files from the dataframe
   images_train = read_images(df_train_data$file)
@@ -165,23 +165,37 @@ classifier <- function(df_train_data, df_test_data, parameters) {
   train_matrix = transform_data(images_train)
   test_matrix = transform_data(images_test)
   
-  #2. Apply the PCA function only to the training
-  pca_values = pca(train_matrix)
-  
-  means = pca_values$mean
-  P = pca_values$P
-  D = pca_values$D
-  
-  #3. KNN with PCA
-  datos_train = data.frame(x = P[,1], #taking the two first components of P
-                     y = P[,2])
-  datos_test = data.frame(x = P[,1], 
-                           y = P[,2])
-  
-  #knn_PCA <- our_knn(datos_train, datos_test, df_train_data$target, 3)
+  if (PCAopt == TRUE) {
+    #2. Apply the PCA function only to the training
+    pca_values = pca(train_matrix)
     
-  #4. KNN without PCA
-  knn_applied <- our_knn(train_matrix, test_matrix, df_train_data$target, 3)
+    means = pca_values$mean
+    train_PCA = pca_values$reduced_data #train data having used PCA to reduce dimensionality
+    D = pca_values$D
+    
+    #3. KNN with PCA
+    #First, we select the data that will be used for KNN.
+    #The training set is already transformed in the previous PCA function.
+    datos_train = data.frame(x = train_PCA[,1], #taking the two first components of train_PCA
+                             y = train_PCA[,2])
+    
+    #The testing set needs to be transformed with the eigenvectors and the mean from
+    #the training set after applying PCA.
+    centered_data <- scale(test_matrix, center = means, scale = F)
+    
+    #When applying the P eigenvectors 
+    test_PCA <- centered_data%*%pca_values$P
+    
+    datos_test = data.frame(x = test_PCA[,1], #taking the two first components of test_PCA
+                             y = test_PCA[,2])
+    print('esto ke es')
+    
+    knn_applied <- our_knn(datos_train, datos_test, df_train_data$target, 3)
+  }
+  else{
+    #KNN without PCA
+    knn_applied <- our_knn(train_matrix, test_matrix, df_train_data$target, 3)
+  }
   
   #identifier = 
   return(knn_applied)
@@ -189,7 +203,7 @@ classifier <- function(df_train_data, df_test_data, parameters) {
 
 parameters = list(var_expained=0.9,k=9,metric='mse',threshold=3)
 
-resultado = classifier(df_train_data, df_test_data, parameters)
+resultado = classifier(df_train_data, df_test_data, parameters, 1) #using PCA
 
 pca_out= pca(resultado) #Our PCA value
 
