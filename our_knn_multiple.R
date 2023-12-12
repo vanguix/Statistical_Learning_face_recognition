@@ -1,10 +1,10 @@
-our_knn_multiple = function(data, tests, target, friends = 3, threshold= 40, metric= 'Euclidean') {
+our_knn_multiple = function(data, tests, target, friends = 3, threshold= 40, metric= 'euclidean') {
   predictions = list()
   
   for (i in 1:nrow(tests)) {
     test = tests[i, , drop = FALSE]
     aux = rbind(data, test)
-    distances = as.matrix(dist(aux,method= metric))
+    distances = as.matrix(dist(aux,method='euclidean'))
     ndata = nrow(data)
     distances = distances[ndata + 1, 1:ndata]
     

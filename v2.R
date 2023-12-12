@@ -209,11 +209,11 @@ classifier <- function(df_train_data, df_test_data,PCAopt,k=3,thres=40) {
     datos_test = data.frame(x = test_PCA[,1], #taking the two first components of test_PCA
                              y = test_PCA[,2])
     
-    knn_applied <- our_knn_multiple(datos_train, datos_test, df_train_data$target, friends=k,threshold=thres)
+    knn_applied <- our_knn_multiple(datos_train, datos_test, df_train_data$target, friends=k, thres)
   }
   else{
     #2.3. KNN without PCA
-    knn_applied <- our_knn_multiple(train_matrix, test_matrix, df_train_data$target, friends=k,threshold=thres)
+    knn_applied <- our_knn_multiple(train_matrix, test_matrix, df_train_data$target, friends=k, thres)
   }
   
   #3. Accuracy from the predictions
@@ -237,7 +237,9 @@ df_test_data <- subset(prueba2,split != 'train')
 
 
 thresholds = list(20,30,40,50)
+
 accuracies = list()
+
 for (th in thresholds){
   resultado = classifier(df_train_data, df_test_data, 0, k=3,thres=th) # not using PCA
   a= accuracy(resultado,df_test_data$target, df_test_data$split)
