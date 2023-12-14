@@ -129,9 +129,10 @@ split_train_test <- function(files) {
 -   **pca**: this function applies the PCA to the data it is provided.
 
 ```{r}
-pca <- function(data) { 
+pca <- function(data, perc) { 
   # INPUT
   # data - a matrix that contains the data to which we must apply the PCA (a set of observations)
+  # perc - a number that determines the percentage of variance that is wanted to be kept, with this parameter it is decided the number of principal componenets that are going to be kept
   
   # OUTPUT
   # result - a list that contains the following elements:
@@ -153,28 +154,30 @@ pca <- function(data) {
   #From now on, we perform everything with the short form of the data matrix (as h<<P).
   # Perform eigenvalue decomposition for the short
   
-  eigen_result <- eigen(cov_matrix) #is the short this transposed?
-
+  eigen_result <- eigen(cov_matrix) #is the short
+  
   # Extract eigenvectors (P) and eigenvalues (e_values)
   e_values <- eigen_result$values #as P will be calculated using the shot and the eigenvalues of the long and the short are the same, we direclty calculate them with the short
-  P_short <- eigen_result$vectors #this cannot be calculated like this as data is too large (36000*36000) so instead we use the short (150x150) 
-  print(dim(P_short)) # should be 150*1????????????????????????? 
-  print(dim(data))
+  P_short <- eigen_result$vectors #this cannot be calculated like this as data is too large (36000*36000) so instead we use the short (n x n) (n - number of instances in the data)
   
+  # Percentage of the variance retaining by the PCs
+  D<-cumsum(e_values)/sum(e_values) # vector length n
+
+  # Find the index of the first term in the vector D that retains the percentage of variance desired
+  index <- which(D >= perc)[1]
   
-  #sdev <- sqrt(e_values) #standard deviations of the principal components
-  
-  #Percentage of the variance retaining by the PCs
-  #D <- cumsum(sdev^2/sum(sdev^2))
-  D<-cumsum(e_values)/sum(e_values)
+  # Retain only the elements until that index and rewrite the vector D and the matrix P until that index
+  D <- D[1:index] # vector of length m (m<n or m=n)
+
+  P_short <- P_short[,1:index] # matrix dim n * m
   
   #Now we calculate the eigenvectors of the long matrix
   #to do this, we need the eigenvectors of the short and data
   
   #When applying the P eigenvectors 
-  P <- t(centered_data)%*%P_short #shape(P) should be 36000*1
+  P <- t(centered_data)%*%P_short #dim(P) 108000 * m
+  reduced_data<-centered_data%*% P # dim(reduced_data) n * m
   
-  reduced_data<-centered_data%*% P
   # Return mean, eigenvectors (matrix P), and variance (matrix D) of the set of observations
   result <- list(mean = mean_vec, P = P, D = D, reduced_data= reduced_data)
   return(result)
@@ -412,9 +415,3 @@ for (th in thresholds){
 }
 
 ```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
