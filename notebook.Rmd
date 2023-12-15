@@ -166,7 +166,8 @@ pca <- function(data, perc) {
   D<-cumsum(e_values)/sum(e_values) # vector length n
 
   # Find the index of the first term in the vector D that retains the percentage of variance desired
-  index <- which(D >= perc)[1]
+  #index <- which(D >= perc)[1]
+  index <- sum(D <= perc)+1
   
   # Retain only the elements until that index and rewrite the vector D and the matrix P until that index
   D <- D[1:index] # vector of length m (m<n or m=n)
@@ -190,7 +191,7 @@ pca <- function(data, perc) {
 -   **our_knn_multiple**: this function applies the knn classification to 'tests' using the training data stored in 'data'.
 
 ```{r}
-our_knn_multiple = function(data, tests, target, friends = 3, threshold=40, metric= 'euclidean') {
+our_knn_multiple = function(data, tests, target, friends = 3, threshold=40, metric= 'manhattan') {
   # INPUT
   # data - a matrix with the training data (excluding the label)
   # test - a matrix with the test data (the data we want to predict, without the label)
@@ -233,7 +234,7 @@ our_knn_multiple = function(data, tests, target, friends = 3, threshold=40, metr
 -   **classifier**: this function classifies the data using the knn and the pca functions.
 
 ```{r}
-classifier <- function(df_train_data, df_test_data,PCAopt,k=3,thres=40,metric='manhattan', perc=0.9) {
+classifier <- function(df_train_data, df_test_data,PCAopt,k,thres,metric='manhattan', perc) {
   # INPUT
   # df_train_data - the data (without the label) of the training set (it is a matrix)
   # df_test_data - the data (without the label) of the test set (it is a matrix)
@@ -398,6 +399,8 @@ To determine the threshold that decides whether an image belongs or not to the d
 
 From this part on, the metric of the distance considered is the 'manhattan' distance, as it is the one that seems to behave the best based on the heatmaps plotted.
 
+thresholds = seq(min(distance_matrix), max(distance_matrix), lenght.out = 11)
+
 ```{r}
 library(gridExtra)
 library(grid)
@@ -429,17 +432,31 @@ resultados_df <- data.frame(metric = character(),
                             k_value = numeric(),
                             accuracy1 = numeric(),
                             accuracy2 = numeric(),
-
                             stringsAsFactors = FALSE)
 
-thresholds = seq(min(distance_matrix), max(distance_matrix))
-
-percentage_var= list(0.85,0.9,0.95)
-
-k_values = list(1,3,5) #we choose odd numbers to avoid ties
 
 # Compute the distances between instances
 distance_matrix= dist(train_matrix, method = "manhattan")
+
+thresholds = seq(min(distance_matrix), max(distance_matrix), length.out = 11)
+
+percentage_var= list(0.85,0.90,0.95)
+
+k_values = list(1,3,5) #we choose odd numbers to avoid ties
+```
+
+```{r}
+k_v = 1
+th=18400
+var = 0.90
+resultado <- classifier(df_train_data, df_test_data, 1, k = k_v, thres = th, metric = 'manhattan', var)
+      a <- accuracy(resultado, df_test_data$target, df_test_data$split)
+      
+```
+
+```{r}
+print(a)
+
 ```
 
 ```{r}
@@ -453,7 +470,7 @@ for (th in thresholds) {
       a <- accuracy(resultado, df_test_data$target, df_test_data$split)
       
       # Almacenar los resultados en el dataframe
-      resultados_df <- rbind(resultados_df, data.frame(metric = metric, threshold = th, percentage_var = var, k_value = k_v, accuracy1 = a[1], accuracy2 = a[2]))
+      resultados_df <- bind_rows(resultados_df, data.frame(metric = "manhattan", threshold = th, percentage_var = var, k_value = k_v, accuracy1 = a[1], accuracy2 = a[2]))
     }
   }
 }
