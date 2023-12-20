@@ -1,0 +1,3 @@
+-> El knn_multiple trabaja sobre una lista y te une el data con el test entero
+->El knn de pepe une el trin con el test (pero el test solo tiene una instancia)
+-> Guardar los resultados en una lista o en un dataframe ?????????????
