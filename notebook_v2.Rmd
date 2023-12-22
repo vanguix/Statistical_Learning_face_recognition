@@ -434,6 +434,8 @@ images_data = read_images(files_list)
 
 # Transform the data into a matrix that can be used
 train_matrix = transform_data(images_data)
+
+print(files_list)
 ```
 
 ### 2.1. Heatmaps
@@ -664,12 +666,72 @@ Once these studies have been performed, it has been verified that the metric of 
 |:-----------|:--------------|:-------------|:------------|:-------------|
 | euclidean  | 3954.6        | 0.9          | 3           | 0.9556       |
 
+## 3. Classifying without dimensionality reduction
+
+Elegimos el threshold según el heatmap sin PCA, teniendo en cuenta el mejor threshold que nos ha salido en el hyperparameter tuning .
+
+k es 3 porque si
+
+euclidean igual
+
+percentage of variance hay que meterlo porque la función classifier lo pide, pero al no hacer PCA no sirve pa na en verdad
+
 ```{r}
-resultado <- classifier(train_matrix, test_matrix, 0, k = 1, thres = 18.36, metric = 'euclidean', 0.9, df_train_data$target)
+resultado <- classifier(train_matrix, test_matrix, 0, k = 3, thres = 18.36, metric = 'euclidean', 0.9, df_train_data$target)
 acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
 cat('Accuracy belong= ', acc$accuracy_belong, '\n')
 cat('Accuracy total= ', acc$accuracy_target, '\n')
 accuracy_without_pca = acc
+```
+
+## 4. Training of the final PCA model
+
+```{r}
+## versión mala 
+# Read all the images
+images_data = read_images(files_list)
+
+# Transform the data into a matrix that can be used
+train_matrix = transform_data(images_data)
+
+images <- c()
+  identifiers <- c()
+  for (image in files) {
+    if (substr(image, nchar(image) - 3 + 1, nchar(image)) == 'jpg') {
+      images <- c(images, image)
+      label <- gsub(".*?([0-9]+).*", "\\1", image)
+      identifiers <- c(identifiers, as.numeric(label)) #there should be 25 ids
+    }
+  }
+  
+  # Set up the dataframe with columns file and target
+  df <- data.frame(images, as.factor(identifiers))
+  names(df) <- c('file', 'target') 
+  
+  
+  fisher_values = fisher_lda(train_matrix, target, perc_fish = perc)
+  W = fisher_values$W
+  means_fisher = fisher_values$mean
+  train_fisher =  fisher_values$projected_data 
+  D = fisher_values$D
+
+  pca_values = pca(train_matrix, 0.9)
+  P= pca_values$P
+  means_pca = pca_values$mean
+  train_PCA =  pca_values$reduced_data 
+  D = pca_values$D
+  centered_data_test <- scale(test_matrix, center = means_pca, scale = F)
+    
+  #When applying the P eigenvectors 
+  test_PCA <- centered_data_test %*% P
+  
+  #When applying the P eigenvectors 
+  test_fisher <- test_PCA %*% W
+  
+  save(file='', W,P, )
+  
+    
+   
 ```
 
 # Part B
