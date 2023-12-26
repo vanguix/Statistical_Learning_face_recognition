@@ -3,43 +3,43 @@ title: "Assignment Statistical Learning"
 output: html_notebook
 ---
 
+# Introduction
+
+The aim of this project is to create a face recognition classifier with two purposes: - The first is to be able to predict if an image corresponds to an individual that belongs to a dataset or not. - The second is, if the individual belongs to the dataset, to be able to classify the image and determine which category it corresponds to. Being each category a particular individual.
+
+The classifier will be based on the K Nearest Neighbors algorithm, this means it will compute the distances between each picture and select the K closest images, that means the K most similar images. Based on these images and knowing the individuals they correspond to, the category of the new image will be the most common category from these 'closest neighbors'.
+
+Due to the high dimensionality of the images data, it is interesting to consider dimensionality reduction techniques. For this project, Principal Component Analysis and Fisher Discriminant Analysis are considered.
+
+On the one hand, Principal Component Analysis is a technique used for dimensionality reduction and allows to reduce the computation time while aiming to retain the maximum percentage of variance explained.
+
+On the other hand, Fisher Discriminant Analysis aims to introduce a transformation in the data that maximized the inter-class distances while minimizing the intra-class distances. Including Fisher transformation in the data is supposed to improve the performance of the classifier.
+
 # Methodology
 
-This assignment has been structured as follows:
+This assignment has been structured in two separate parts: - The first part uses the PCA and the second one uses the Fisher Discriminant Analysis. - For the second part, it was also required to include the PCA to transform the data before using the Fisher Discriminant Analysis. This is due to the large size of the data matrices.
 
-First, we loaded the data and transformed each image to appropriate format. Later, we split the dataset for the hyperparameter tuning into two sets: train and test. For every individual in the training set there is one image in the test set. However, to develop a classifier that is able to distinguish between people that are in the dataset and people that are not, we have defined two different categories for the instances in the test set:
+For both cases, the best classifier possible was to be retrieved, for that reason, hyperparameter tuning was required.
+
+For each part, the structure is the same. The required functions have been created, to read the images, to classify, etc. The first step is to load the data and transform each image to the appropriate format.
+
+For hyperparameter tuning it is required to divide the available data into train and test set. This separation has been made taking into account two considerations: for every individual in the training set there are 5 images in the training set and 1 in the test set. Also, two individuals have not been included in the training set and all their images are only in the test set. This procedure aims to develop a classifier that is able to distinguish between people that are in the dataset and people that are not. So the test set is divided into two categories:
 
 -   **test1**: this refers to the images of individuals that belong to the training set.
 
 -   **test2**: this refers to the images of individuals that do not belong to the training set.
 
-Then we have applied the corresponding dimensionality reduction techniques:
+Then, the hyperparameters have been optimized, training the classifier in the train set and then computing the performance in the test set. The performance metric that has been used to determine the performance is the *accuracy*. Accuracy is defined as the proportion of accurate predictions the classifier makes.
 
--   For Part A, Principal Component Analysis has been used to reduce the dimensionality of the data.
-
--   For part B, Fisher Discriminant Analysis has been used. As this algorithm is too complicated to implement in high dimensionality data, PCA was also applied to the data previously.
-
-For both case A and case B, hyperparameter tuning has been used to determine the optimum values for the following hyperparameters:
-
--   threshold
-
--   percentage of variance explained
-
--   metric
-
--   K (number of neighbors)
-
-First, as a first approach to decide the metric and the threshold, we have plotted the heatmaps for each different metric. This helps decide which are the best metrics to distinguish the different individuals, also allows to estimate the values that seem reasonable for the thresholds.
-
-Then, once this previous study is already done and the metric is determined, a grid search is performed to iterate over the different combinations of the other hyperparameters and compute the accuracy each time. Finally, the combination that corresponds to the highest accuracy will be chosen for both the case of PCA and the Fisher. For part A, the raw data has also been used with the classifier, to determine the differences in execution time and performance with that raw data.
+Finally, with the optimum combination of hyperparameters, the final classifier for each method was created. Additionaly, for the case of the PCA, a classifier was implemented using the raw data, this is data with no previous transformation. This was made to analyze the differences when applying PCA.
 
 # Part A
 
-This first part of the assignment, a facial recognizer based on principal component analysis will be implemented. In order to build this classifier, a frontal facial image dataset will be used. This dataset is stored in a folder called 'Training' in the C: disk of the device.
+This first part of the assignment, a facial recognizer based on Principal Component Analysis will be implemented. In order to build this classifier, a frontal facial image dataset will be used. This dataset is stored in a folder called 'Training' in the C: disk of the device.
 
 ## 1. Definition of the functions
 
-In this first part, the functions that will be used later will be defined and explained. Some functions are required for both the Part A and Part B (read_images, transform_data, split_train_test)
+In this first part, the functions that will be used later will be defined and explained. Some functions are required for both the Part A and Part B (read_images, transform_data, split_train_test, our_knn_single) and some others are specific for part A (pca and classifier).
 
 -   **read_images**: this function allows to read the data from every image in a list when the path of each of the files is provided
 
@@ -279,7 +279,7 @@ classifier <- function(train_matrix, test_matrix,PCAopt,k,thres,metric='manhatta
   # thres - threshold value to determine whether a new image belongs to the dataset or not
   
   # OUTPUT
-  # it returns the output of the knn applied
+  # predictions - a list with the predicted classes per each test instance
   
   #1. Read the files from the dataframe
   #images_train = read_images(df_train_data$file)
@@ -342,38 +342,7 @@ classifier <- function(train_matrix, test_matrix,PCAopt,k,thres,metric='manhatta
 
 ```
 
--   **accuracy**: this function compute the accuracies when you specify a prediction and a target.
-
-```{r}
-
-accuracy_old <- function(prediction, target, test_type){
-  # INPUT
-  # prediction - a ordered list with the predictions of the model
-  # target - a ordered list with the actual labels of the data
-  # test_type - a ordered list with the set that every instance belongs to (test1 or test2)
-  
-  # OUTPUT
-  # it returns a list with two accuracies:
-  # accuracy_belong: it is the accuracy of the model to predict whether an instance belongs or not to the dataset
-  # accuracy_target: it is the accuracy of the model to predict the correct category of the instance
-  print('Calculating accuracies')
-  corrects_belong= 0
-  corrects_target=0
-  for (i in seq_along(prediction)){
-    if ((prediction[i] == '0' & test_type[i]=='test2') | (prediction[i] != '0' & test_type[i]=='test1')){
-      corrects_belong = corrects_belong + 1 
-      
-      if(prediction[i]== target[i]){
-        corrects_target= corrects_target + 1
-      }
-      }
-  }
-  
-  accuracy_belong= corrects_belong/ length(prediction)
-  accuracy_target = corrects_target/ length(prediction)
-  return((list(accuracy_belong = accuracy_belong, accuracy_target = accuracy_target)))
-}
-```
+-   **accuracy**: this function computes the accuracies when you specify a prediction and a target.
 
 ```{r}
 accuracy <- function(prediction, target, test_type){
@@ -501,7 +470,7 @@ Another conclusion that can be drawn is that the distance metric that gives the 
 
 ### 2.2. Grid search (for the remaining hyperparameters)
 
-Now this previous analysis has been made, the remaining hyperparameters will be tuned. Still it is not clear if the manhattan distance or the euclidean distance will perform better, so both cases will be considered and the one that obtains a better accuracy will be chosen.
+Now this previous analysis has been made, the remaining hyperparameters will be tuned. Still it is not clear if the Manhattan distance or the Euclidean distance will perform better, so both cases will be considered and the one that obtains a better accuracy will be chosen.
 
 First of all, data must be split into train and test sets. The train set will only be used to train the model and the test set to compute the accuracy of the model for each combination of hyperparameters.
 
@@ -531,10 +500,10 @@ test_matrix = transform_data(images_test)
 
 #### 2.2.1. Grid search for euclidean metric
 
-For the euclidean metric, a grid search will be performed, iterating over the
+For the Euclidean metric, a grid search will be performed, iterating over all possible combinations of the remaining hyperparameters (threshold, friends and percentage of variance) and computing the accuracy for each combination.
 
 ```{r}
-# Inicializar un dataframe para almacenar los resultados
+# Initialize a dataframe to store the results
 resultados_df_euclidean <- data.frame(metric = character(),
                             threshold = numeric(),
                             percentage_var = numeric(),
@@ -554,10 +523,10 @@ percentage_var= list(0.85,0.90,0.95)
 k_values = list(1,3,5) #we choose odd numbers to avoid ties
 
 for (th in thresholds_euclidean) {
-  results[[as.character(th)]] <- list()
+  results_euclidean[[as.character(th)]] <- list()
   
   for (var in percentage_var) {
-    results[[as.character(th)]][[as.character(var)]] <- list()
+    results_euclidean[[as.character(th)]][[as.character(var)]] <- list()
 
     for (k_v in k_values) {
       resultado <- classifier(train_matrix, test_matrix, 1, k = k_v, thres = th, metric = 'euclidean', var, df_train_data$target)
@@ -575,12 +544,12 @@ for (th in thresholds_euclidean) {
 }
 ```
 
-#### 2.2.1. Grid search for manhattan metric
+#### 2.2.2. Grid search for manhattan metric
 
-Now, the same accuracies measure will be made with another metric:
+Now, the same procedure will be repeated with the Manhattan metric:
 
 ```{r}
-# Inicializar un dataframe para almacenar los resultados
+# Initialize a dataframe to store the results
 resultados_df_manhattan <- data.frame(metric = character(),
                             threshold = numeric(),
                             percentage_var = numeric(),
@@ -600,21 +569,16 @@ percentage_var= list(0.85,0.90,0.95)
 k_values = list(1,3,5) #we choose odd numbers to avoid ties
 
 for (th in thresholds_manhattan) {
-  results[[as.character(th)]] <- list()
   
   for (var in percentage_var) {
-    results[[as.character(th)]][[as.character(var)]] <- list()
 
     for (k_v in k_values) {
       resultado <- classifier(train_matrix, test_matrix, 1, k = k_v, thres = th, metric = 'manhattan', var, df_train_data$target)
-      results_manhattan[[as.character(th)]][[as.character(var)]][[as.character(k_v)]] <- resultado
-
-      #a <- sum(as.character(resultado) == as.character(df_test_data$target)) / length(resultado)
       acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
 
       cat('Accuracy= ', acc, '\n')
 
-      # Almacenar los resultados en el dataframe
+      # Store the results in the dataset
       resultados_df_manhattan <- rbind(resultados_df_manhattan, data.frame(metric = "manhattan", threshold = th, percentage_var = var, k_value = k_v, accuracy = acc))
     }
   }
@@ -622,117 +586,217 @@ for (th in thresholds_manhattan) {
 
 ```
 
-Based on the results from the previous executions, the metric that performs the best is the 'euclidean', the threshold that performs the best is around 3954.6 and the number of neighbors seems not to affect the result when it varies between 1, 3 or 5. To obtain the best accuracy, now, we are going to define more values for the percentage of variance explained in order to fine-tune this hyperparameter.
+Based on the results from the previous executions, the metric that performs the best is the 'euclidean', the threshold that performs the best is around 3954.6 and the number of neighbors seems not to affect the result when it varies between 1, 3 or 5.
+
+#### 2.2.3. Fine tuning grid search
+To obtain the best accuracy, now, we are going to define more values for the percentage of variance explained and the threshold around the values that performed better in order to fine-tune these hyperparameters.
 
 ```{r}
 
-# Define the optimum values
-opt_k = 1
-opt_th = 3954.6
+# Fine tune the threshold and percentage of variance
+threshonds_fine = seq(93.48, 4524.22, length.out=11)
 
-# Inicializar un dataframe para almacenar los resultados
-resultados_df_euclidean_fine <- data.frame(metric = character(),
+percentage_var_fine = seq(0.9,0.99,0.005)
+
+k_v = 3
+
+# Initialize a dataframe to store the results
+resultados_df_fine <- data.frame(metric = character(),
                             threshold = numeric(),
                             percentage_var = numeric(),
                             k_value = numeric(),
-                            accuracy_total = numeric(),
-                            accuracy_belong = numeric(),
+                            accuracy = numeric(),
                             stringsAsFactors = FALSE)
 
-percentage_var = seq(0.9,0.99,0.005)
+
+results_fine = list()
+
+for (th in threshonds_fine) {
   
-for (var in percentage_var) {
-  resultado <- classifier(train_matrix, test_matrix, 1, k = opt_k, thres = opt_th, metric = 'euclidean', var, df_train_data$target)
+  for (var in percentage_var_fine) {
+   
+    resultado <- classifier(train_matrix, test_matrix, 1, k = k_v, thres = th, metric = 'euclidean', var, df_train_data$target)
+    acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
+    cat('Accuracy= ', acc, '\n')
 
-  #a <- sum(as.character(resultado) == as.character(df_test_data$target)) / length(resultado)
-  acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
-
-  cat('Accuracy belong= ', acc$accuracy_belong, '\n')
-  cat('Accuracy total= ', acc$accuracy_target, '\n')
-
-  # Almacenar los resultados en el dataframe
-  resultados_df_euclidean_fine <- rbind(resultados_df_euclidean_fine, data.frame(metric = "euclidean", threshold = opt_th, percentage_var = var, k_value = opt_k, accuracy_total = acc$accuracy_target, accuracy_belong= acc$accuracy_belong ))
+    # Store the results in the database
+    resultados_df_fine <- rbind(resultados_df_fine, data.frame(metric = "euclidean", threshold = th, percentage_var = var, k_value = k_v, accuracy = acc))
+  }
 }
 
 
-
 ```
+This last stage of fine tuning achieves accuracies of 1.00, which is the best possible value to achieve.
 
 ### 2.3. Hyperparameter decission
 
-Once these studies have been performed, it has been verified that the metric of the distance that classifies better is the 'euclidean' distance. Also, the threshold that performs the best is the 3954.6. For the number of neighbors, it has been proved that 1, 3 and 5 neighbors obtain the same results. Based on this, the chosen value for k is 3 because between 1,3 and 5 it is going to be more robust than choosing k = 1. The percentage of variance explained does not change from 0.9 to 0.95.
+Once these studies have been performed, it has been verified that the metric of the distance that classifies better is the 'euclidean' distance.
+
+For the number of neighbors, it has been proved that 1, 3 and 5 neighbors obtain the same results. Based on this, the chosen value for k is 3 because between 1,3 and 5 it is going to be more robust than choosing k = 1.
+Also, fine tuning lets us know that the optimum accuracy is reached when the threshold oscillates between 1865.776 and 2751.924 independently of the percentage of variance explained. So an average value between these two has been chosen: 2308.85
+
+The percentage of variance explained does not change from 0.9 to 0.99, so the value chosen is 0.9, because it is the one that retains less components and so, computationaly more efficient.
 
 | **metric** | **threshold** | **perc_var** | **k_value** | **accuracy** |
 |:-----------|:--------------|:-------------|:------------|:-------------|
-| euclidean  | 3954.6        | 0.9          | 3           | 0.9556       |
+| euclidean  | 2308.85        | 0.9          | 3           | 1.00       |
 
 ## 3. Classifying without dimensionality reduction
 
-Elegimos el threshold según el heatmap sin PCA, teniendo en cuenta el mejor threshold que nos ha salido en el hyperparameter tuning .
+Now, classifying without using the PCA, to compare the results from PCA and without PCA. Again some hyperparameter tuning is required to optimize the performance of the classifier.
 
-k es 3 porque si
+### 3.1. Choosing the threshold for raw data
 
-euclidean igual
+According to previous results and to the heatmaps shown in section 2.1.1., the metric that performs better is the euclidean.
 
-percentage of variance hay que meterlo porque la función classifier lo pide, pero al no hacer PCA no sirve pa na en verdad
+The number of neighbors that performs best is 3 as it is explained before.
 
+The threshold must be tuned again, because the values for threshold change when applying PCA, so this hyperparameter will be tuned in an iterative way.
+
+The percentage of variance explained does not apply, as the PCA is not implemented in this section.
 ```{r}
-resultado <- classifier(train_matrix, test_matrix, 0, k = 3, thres = 18.36, metric = 'euclidean', 0.9, df_train_data$target)
-acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
-cat('Accuracy belong= ', acc$accuracy_belong, '\n')
-cat('Accuracy total= ', acc$accuracy_target, '\n')
-accuracy_without_pca = acc
+# Tuning the threshold
+
+# Initialize a dataframe to store the results
+resultados_df_raw <- data.frame(
+  threshold = numeric(),
+  accuracy = numeric(),
+  stringsAsFactors = FALSE)
+
+results_raw = list()
+# Compute the distances between instances
+distance_matrix_raw= dist(train_matrix, method = 'euclidean')
+
+# Stablish the values of the hyperparameters 
+k_v = 3
+var = 0.9 # as the function is defined it is required to specify the percentage of variance explained but it is not used as PCA is not applied
+# From the results of the heatmaps, the best threshold seems to be between those values
+thresholds_raw = seq(min(distance_matrix_raw), max(distance_matrix_raw), length.out = 11)
+
+for (th in thresholds_euclidean) {
+  resultado <- classifier(train_matrix, test_matrix, 0, k = k_v, thres = th, metric = 'euclidean', var, df_train_data$target)
+  acc <- accuracy(resultado, df_test_data$target, df_test_data$split)
+  cat('Accuracy= ', acc, '\n')
+
+  # Store the results in the dataframe
+  resultados_df_raw <- rbind(resultados_df_raw, data.frame(threshold = th, accuracy = acc))
+
+}
 ```
 
+
+### 3.2. Model with raw data 
+With these results, the optimum hyperparameters for the raw data model are the following:
+
+| **metric** | **threshold** | **perc_var** | **k_value** | **accuracy** |
+|:-----------|:--------------|:-------------|:------------|:-------------|
+| euclidean  | XXX        | 0.9          | 3           | XXX       |
+ 
+
+
+
 ## 4. Training of the final PCA model
+The final model will use the PCA dimensionality reduction because it obtains an accuracy of 1.00 and is also faster. Also, it will use the optimum hyperparameters that have been already calculated in the previous sections. The classifier that uses PCA will be defined here but also in another R script.
+
+For the final model, the complete training set will be used, not leaving for testing, in order to get the best possible performance of the final model.
+
+The transformation matrix P, the transformed train data, the means of the columns, the percentage of variance explained D, and the target of the training data will be stored in a Rdata file. This saves time from reading and transforming the training data each time.
 
 ```{r}
-## versión mala 
+
+
+# Specify the directory containing the image files
+image_directory <- "C:/Training"
+
+# Obtain the file list with all the files in the folder
+files_list <- list.files(path = image_directory, pattern = ".*\\.jpg$", full.names = TRUE)
+
 # Read all the images
 images_data = read_images(files_list)
 
 # Transform the data into a matrix that can be used
-train_matrix = transform_data(images_data)
+all_data = transform_data(images_data)
 
-images <- c()
-  identifiers <- c()
-  for (image in files) {
-    if (substr(image, nchar(image) - 3 + 1, nchar(image)) == 'jpg') {
-      images <- c(images, image)
-      label <- gsub(".*?([0-9]+).*", "\\1", image)
-      identifiers <- c(identifiers, as.numeric(label)) #there should be 25 ids
-    }
+# Save the required matrices and vectors in a Rdata file
+pca_values = pca(all_data, 0.95)
+P_pca= pca_values$P
+means_pca = pca_values$mean
+train_pca =  pca_values$reduced_data 
+D_pca= pca_values$D
+target = df$target
+save(file='PCA_data.Rdata', P_pca,means_pca,train_pca,D_pca,target)
+
+
+PCA_Classifier <- function(name){
+  # INPUT
+  # name - name of the image that is going to be tested, example 'anonym1.jpg'
+  # NOTE: the image must be in the same path as the R file
+  
+  # OUTPUT
+  # predicted_class - classification of the image (number ID)
+  
+  # Use the optimum hyperparameters
+  metric = 'euclidean'
+  threshold = 3954.6
+  friends = 3 
+  
+  # Include required libraries and Rdata files
+  library(OpenImageR)
+  load("PCA_data.Rdata")
+  # NOTE: PCA_data.Rdata must be in the same folder
+  # This will load:
+  #    P_pca - the transformation matrix
+  #    train_pca - the matrix of the training data once applied PCA
+  #    D_pca - the vector that specifies which percentage of variance is retained per each PC
+  #    means_pca - the vector of the means
+  
+  # Read and transform the test image
+  image_directory <- name
+  data_image = readImage(image_directory)
+  
+  red <- as.vector(data_image[, , 1])
+  green <- as.vector(data_image[, , 2])
+  blue <- as.vector(data_image[, , 3])
+  test_image <- c(red, green, blue)
+  
+  # Apply the transformation to the test data
+  test_PCA = test_image %*% P_pca
+  
+  # Compute the distances between the test image and the previous data
+  aux = rbind(train_PCA, test_PCA)
+  distances = as.matrix(dist(aux),method=metric)
+  distance = distances[2, 1:1]
+  
+  # Predict the class based on the nearest neighbors
+  nearest_neighbors <- order(distance)[1:friends]
+  neighbor_class <- target[nearest_neighbors]
+  tb = table(neighbor_class)
+  
+  # Stablish if the person is in the dataset or not
+  if (min(distance) > threshold) {
+    # If the person in the image is not in the training dataset, set to 0
+    predicted_class = 0
+  } else {
+    # If the person in the image is in the training dataset it predicts which is the most similar
+    predicted_class = names(tb)[which.max(tb)]
   }
   
-  # Set up the dataframe with columns file and target
-  df <- data.frame(images, as.factor(identifiers))
-  names(df) <- c('file', 'target') 
-  
-  
-  fisher_values = fisher_lda(train_matrix, target, perc_fish = perc)
-  W = fisher_values$W
-  means_fisher = fisher_values$mean
-  train_fisher =  fisher_values$projected_data 
-  D = fisher_values$D
+  return(predicted_class)
+}
 
-  pca_values = pca(train_matrix, 0.9)
-  P= pca_values$P
-  means_pca = pca_values$mean
-  train_PCA =  pca_values$reduced_data 
-  D = pca_values$D
-  centered_data_test <- scale(test_matrix, center = means_pca, scale = F)
-    
-  #When applying the P eigenvectors 
-  test_PCA <- centered_data_test %*% P
-  
-  #When applying the P eigenvectors 
-  test_fisher <- test_PCA %*% W
-  
-  save(file='', W,P, )
-  
-    
-   
+## versión mala: no predice bien
+
 ```
+
+Now, we can try the model with the validation images that have been provided:
+```{r}
+
+PCA_Classifier("9332898.15.jpg")
+PCA_Classifier("anonym1.4.jpg")
+PCA_Classifier("pspliu.1.jpg")
+
+```
+
 
 # Part B
 
